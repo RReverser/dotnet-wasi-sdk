@@ -8,14 +8,14 @@
 
 	<UsingTask TaskName="Wasi.Sdk.Tasks.EmitWasmBundleObjectFile" AssemblyFile="$(WasiSdkTaskAssembly)" />
 	<UsingTask TaskName="Wasi.Sdk.Tasks.WasmResolveAssemblyDependencies" AssemblyFile="$(WasiSdkTaskAssembly)" />
-	
+
 	<PropertyGroup>
 		<!-- Keep this block all in sync manually, since URLs can be arbitrary -->
 		<WasiSdkVersion>16.0</WasiSdkVersion>
 		<WasiSdkUrl Condition="$([MSBuild]::IsOSPlatform('Windows'))">https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-16/wasi-sdk-16.0-mingw.tar.gz</WasiSdkUrl>
 		<WasiSdkUrl Condition="$([MSBuild]::IsOSPlatform('Linux'))">https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-16/wasi-sdk-16.0-linux.tar.gz</WasiSdkUrl>
 		<WasiSdkUrl Condition="$([MSBuild]::IsOSPlatform('OSX'))">https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-16/wasi-sdk-16.0-macos.tar.gz</WasiSdkUrl>
-		
+
 		<WasiSdkRoot>$([System.IO.Path]::Combine("$([System.Environment]::GetFolderPath(SpecialFolder.UserProfile))", ".wasi-sdk", "wasi-sdk-$(WasiSdkVersion)"))</WasiSdkRoot>
 		<WasiClang>$(WasiSdkRoot)\bin\clang</WasiClang>
 		<WasiClang Condition="$([MSBuild]::IsOSPlatform('Windows'))">$(WasiClang).exe</WasiClang>
@@ -36,7 +36,7 @@
 	<PropertyGroup Condition="'$(RunCommand)' == '' AND '$(WasiRunner)' != ''">
 		<RunCommand>$(WasiRunner)</RunCommand>
 		<RunWorkingDirectory>$(MSBuildProjectDirectory)</RunWorkingDirectory>
-		
+
 		<!-- For some reason neither $(OutDir) nor $(OutputPath) seem to be set-->
 		<RunArguments>bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).wasm</RunArguments>
 
@@ -102,7 +102,7 @@
 		<WasmResolveAssemblyDependencies EntryPoint="$(OutDir)$(TargetFileName)" ApplicationAssemblies="@(_WasmApplicationAssemblies)" WasiRuntimePackAssemblies="@(_WasiRuntimePackAssemblies)">
 			<Output TaskParameter="Dependencies" ItemName="_WasmTransitivelyReferencedAssemblies" />
 		</WasmResolveAssemblyDependencies>
-		
+
 		<!-- Optionally, trim during the build -->
 		<!-- This produces a lot of messy warnings, and has no incrementalism, so should be considered extra-experimental -->
 		<PropertyGroup Condition="'$(WasiTrim)' == 'true' AND '$(DOTNET_HOST_PATH)' == ''">
@@ -123,12 +123,12 @@
 			NoWarn="1701;1702;1701;1702"
 			RemoveSymbols="true"
 			ToolExe="$(_DotNetHostFileName)"
-			ToolPath="$(_DotNetHostDirectory)" />		
+			ToolPath="$(_DotNetHostDirectory)" />
 		<ItemGroup Condition="'$(WasiTrim)' == 'true'">
 			<_WasmTransitivelyReferencedAssemblies Remove="@(_WasmTransitivelyReferencedAssemblies)" />
 			<_WasmTransitivelyReferencedAssemblies Include="$(IntermediateOutputPath)dotnet-wasi-sdk\linked\*.dll" />
 		</ItemGroup>
-		
+
 		<!-- Make a list of any corresponding .pdb files we can find -->
 		<ItemGroup>
 			<_WasmTransitivelyReferencedPdbs
@@ -167,7 +167,7 @@
 				<ObjectFile>$(_WasmBundleObjectsIntermediateDir)%(WasmBundleFilesWithHashes.Filename)%(WasmBundleFilesWithHashes.Extension).$([System.String]::Copy(%(WasmBundleFilesWithHashes.FileHash)).Substring(0, 8)).o</ObjectFile>
 			</WasmBundleFilesWithHashes>
 		</ItemGroup>
-		<EmitWasmBundleObjectFile FilesToBundle="@(WasmBundleFilesWithHashes)" ClangExecutable="$(WasiClang)">
+		<EmitWasmBundleObjectFile FilesToBundle="@(WasmBundleFilesWithHashes)" ClangExecutable="$(WasiClang)" Optimize="'$(Configuration)' == 'Release'">
 			<Output TaskParameter="BundleApiSourceCode" ItemName="_WasiBundleApiSourceCode" />
 		</EmitWasmBundleObjectFile>
 
@@ -189,7 +189,7 @@
 		</ItemGroup>
 		<Delete Files="@(WasmBundleFileToDelete)" />
 	</Target>
-	
+
 	<Target Name="BuildWasm" Inputs="@(BuildWasmInputs)" Outputs="$(WasmOutputIntermediateFile)" DependsOnTargets="GenerateWasmBundleSources">
 		<!-- Generate a file entrypoint_YourAssemblyName.c containing the dotnet_wasi_getentrypointassemblyname symbol.
 			 This means we don't have to hardcode the assembly name in main.c -->
@@ -218,6 +218,7 @@
 			<WasiSdkClangArgs Condition="'@(WasiAfterRuntimeLoadedDeclarations)' != ''">$(WasiSdkClangArgs) -D WASI_AFTER_RUNTIME_LOADED_DECLARATIONS=&quot;@(WasiAfterRuntimeLoadedDeclarations, ' ')&quot;</WasiSdkClangArgs>
 			<WasiSdkClangArgs Condition="'@(WasiAfterRuntimeLoadedCalls)' != ''">$(WasiSdkClangArgs) -D WASI_AFTER_RUNTIME_LOADED_CALLS=&quot;@(WasiAfterRuntimeLoadedCalls, ' ')&quot;</WasiSdkClangArgs>
 			<WasiSdkClangArgs>$(WasiSdkClangArgs) -o &quot;$(WasmOutputIntermediateFile)&quot;</WasiSdkClangArgs>
+			<WasiSdkClangArgs Condition="'$(Configuration)' == 'Release'">$(WasiSdkClangArgs) -O3</WasiSdkClangArgs>
 		</PropertyGroup>
 		<MakeDir Directories="$(WasmOutputIntermediateDir)" />
 		<Message Importance="normal" Text="Performing WASI SDK build: &quot;$(WasiClang)&quot; $(WasiSdkClangArgs)" />

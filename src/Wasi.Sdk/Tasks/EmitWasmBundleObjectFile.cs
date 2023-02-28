@@ -30,6 +30,9 @@ public class EmitWasmBundleObjectFile : Microsoft.Build.Utilities.Task, ICancela
     [Required]
     public string ClangExecutable { get; set; } = default!;
 
+    [Required]
+    public bool Optimize { get; set; } = default!;
+
     [Output]
     public string? BundleApiSourceCode { get; set; }
 
@@ -100,10 +103,16 @@ public class EmitWasmBundleObjectFile : Microsoft.Build.Utilities.Task, ICancela
 
         Directory.CreateDirectory(Path.GetDirectoryName(destinationObjectFile)!);
 
+        var clangArgs = $"-xc -o \"{destinationObjectFile}\" -c -";
+        if (Optimize)
+        {
+            clangArgs += " -O3";
+        }
+
         var clangProcess = Process.Start(new ProcessStartInfo
         {
             FileName = ClangExecutable,
-            Arguments = $"-xc -o \"{destinationObjectFile}\" -c -",
+            Arguments = clangArgs,
             RedirectStandardInput = true,
             UseShellExecute = false,
         })!;
